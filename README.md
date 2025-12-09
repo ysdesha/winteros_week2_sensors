@@ -4,8 +4,9 @@
 [image2]: ./assets/addingcam.png "Adding a camera"
 [image3]: ./assets/addingcam2.png "Adding a camera"
 [image4]: ./assets/cam_rqt.png "Adding a camera"
-[image5]: ./assets/compressed-1.png "Adding a camera"
-[image6]: ./assets/rqt-reconfigure.png "rqt reconfigure"
+[image5]: ./assets/compressed_rqt.png "Adding a camera"
+[image6]: ./assets/compressed_rviz.png "Adding a camera"
+[image7]: ./assets/rqt_reconfigure.png "rqt reconfigure"
 
 
 # WinteROS Week 2
@@ -217,5 +218,132 @@ ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 
 ![alt text][image3]
 ![alt text][image4]
+
+## Image transport
+
+We can see that both `/camera/camera_info` and `/camera/image` topics are forwarded. Although this is still not the ideal way to forward the camera image from Gazebo. ROS has a very handy feature with it's image transport protocol plugins, it's able to automatically compress the video stream in the background without any additional work on our side. But this feature doesn't work together with `parameter_bridge`. Without compression the 640x480 camera stream consumes almost 20 MB/s network bandwith which is unacceptable for a wireless mobile robot.
+
+Therefore there is a dedicated `image_bridge` node in the `ros_gz_image` package. Let's modify our launch file to the following:
+
+```python
+    # Node to bridge /cmd_vel and /odom
+    gz_bridge_node = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
+            "/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry",
+            "/joint_states@sensor_msgs/msg/JointState@gz.msgs.Model",
+            "/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V",
+            #"/camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
+            "/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
+
+        ],
+        output="screen",
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+        ]
+    )
+
+    # Node to bridge camera image with image_transport and compressed_image_transport
+    gz_image_bridge_node = Node(
+        package="ros_gz_image",
+        executable="image_bridge",
+        arguments=[
+            "/camera/image",
+        ],
+        output="screen",
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time'),
+             'camera.image.compressed.jpeg_quality': 75},
+        ],
+    )
+```
+
+We also have to add the new node to the `launchDescription`:
+
+```python
+launchDescriptionObject.add_action(gz_image_bridge_node)
+```
+
+After rebuild we can try it using `rqt` and we will see huge improvement in the bandwith thanks to the `jpeg` compression.
+![alt text][image5]
+
+> If compressed images are not visible in rqt, you have to install the plugins you want to use:
+> - `sudo apt install ros-jazzy-compressed-image-transport`: for jpeg and png compression
+> - `sudo apt install ros-jazzy-theora-image-transport`: for theora compression
+> - `sudo apt install ros-jazzy-zstd-image-transport`: for zstd compression
+
+But we face another issue, this time in RViz, the uncompressed camera stream is visible as before but the compressed one isn't due to the following warning:
+
+```
+Camera Info
+Expecting Camera Info on topic [/camera/image/camera_info]. No CameraInfo received. Topic may not exist.
+```
+
+It's because RViz always expect the `image` and `the camera_info` topics with the same prefix which works well for:
+
+`/camera/image` &#8594; `/camera/camera_info`
+
+But doesn't work for:
+
+`/camera/image/compressed` &#8594; `/camera/image/camera_info`
+
+because we don't publish the `camera_info` to that topic. We could remap the `camera_info` to that topic, but then the uncompressed image won't work in RViz, so it's not the desired solution.
+
+But there is another useful tool that we can use, the `relay` node from the `topic_tools` package:
+
+```python
+    # Relay node to republish /camera/camera_info to /camera/image/camera_info
+    relay_camera_info_node = Node(
+        package='topic_tools',
+        executable='relay',
+        name='relay_camera_info',
+        output='screen',
+        arguments=['camera/camera_info', 'camera/image/camera_info'],
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+        ]
+    )
+```
+
+Of course, don't forget to add it to the `launchDescription` too:
+```python
+launchDescriptionObject.add_action(relay_camera_info_node)
+```
+
+> If `topic_tools` is not installed you can install it with `sudo apt install ros-jazzy-topic-tools`
+
+Rebuild the workspace and let's try it!
+
+```bash
+ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+```
+![alt text][image6]
+
+## rqt reconfigure
+
+We already set up the `jpeg` quality in the `image_bridge` node with the following parameter:
+```python
+'camera.image.compressed.jpeg_quality': 75
+```
+
+But how do we know what is the name of the parameter and what other settings do we can change? To see that we will use the `rqt_reconfigure` node.
+
+First start the simulation:
+```bash
+ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+```
+
+Then start rqt_reconfigure:
+```bash
+ros2 run rqt_reconfigure rqt_reconfigure
+```
+
+![alt text][image7]
+
+We can play with the parameters here, change the compression or the algorithm as we wish and we can monitor it's impact with `rqt`.
+
 
 
