@@ -1,9 +1,9 @@
 [//]: # (Image References)
 
-[image1]: ./assets/starter-package.png "Starter package"
-[image2]: ./assets/camera-first-try.png "Adding a camera"
-[image3]: ./assets/camera.png "Adding a camera"
-[image4]: ./assets/compressed.png "Adding a camera"
+
+[image2]: ./assets/addingcam.png "Adding a camera"
+[image3]: ./assets/addingcam2.png "Adding a camera"
+[image4]: ./assets/cam_rqt.png "Adding a camera"
 [image5]: ./assets/compressed-1.png "Adding a camera"
 [image6]: ./assets/rqt-reconfigure.png "rqt reconfigure"
 
@@ -216,5 +216,6 @@ ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 ```
 
 ![alt text][image3]
+![alt text][image4]
 
 
