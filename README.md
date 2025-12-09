@@ -70,10 +70,10 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 # Camera
 
 To add a camera - and every other sensors later - we have to change 2 files:
-1) The `mogi_bot.urdf`: we have to define the position, orientation and other physical properties of the camera in this file. This is not necessarily simulation dependent, we have to do these same changes in the urdf in case of a real robot with a real sensor.
-2) The `mogi_bot.gazebo`: this is fully simulation dependent, we have to define the properties of the simulated camera in this file.
+1) The `erc_bot.urdf`: we have to define the position, orientation and other physical properties of the camera in this file. This is not necessarily simulation dependent, we have to do these same changes in the urdf in case of a real robot with a real sensor.
+2) The `erc_bot.gazebo`: this is fully simulation dependent, we have to define the properties of the simulated camera in this file.
 
-Let's add the camera first to the `mogi_bot.urdf`:
+Let's add the camera first to the `erc_bot.urdf`:
 
 ```xml
   <!-- STEP 7 - Camera -->
@@ -132,7 +132,7 @@ As we see above, the camera is a 3 x 3 x 3 cm cube, attached to the `base_link` 
 
 `camera_optical_joint` applies a static rotation so that the camera data will be interpreted correctly by ROS tools that assume the Z-forward convention for image and depth sensors.
 
-Now let's add the simulated camera into `mogi_bot.gazebo`:
+Now let's add the simulated camera into `erc_bot.gazebo`:
 
 ```xml
   <gazebo reference="camera_link">
@@ -181,7 +181,7 @@ We can rebuild the workspace and try our changes, but it will not yet work. The 
 
 > It's possible to reload the urdf without restarting the nodes by setting the parameter from the terminal:
 > ```bash
-> ros2 param set /robot_state_publisher robot_description "$(xacro $(ros2 pkg prefix bme_gazebo_sensors)/share/bme_gazebo_sensors/urdf/mogi_bot.urdf)"
+> ros2 param set /robot_state_publisher robot_description "$(xacro $(ros2 pkg prefix erc_gazebo_sensors)/share/erc_gazebo_sensors/urdf/erc_bot.urdf)"
 > ```
 
 ![alt text][image2]
@@ -213,7 +213,7 @@ With the new Gazebo simulator topics are not automatically forwarded as we alrea
 Let's rebuild the workspace and try it again:
 
 ```bash
-ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+ros2 launch erc_gazebo_sensors spawn_robot.launch.py
 ```
 
 ![alt text][image3]
@@ -221,7 +221,7 @@ ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 
 ## Image transport
 
-We can see that both `/camera/camera_info` and `/camera/image` topics are forwarded. Although this is still not the ideal way to forward the camera image from Gazebo. ROS has a very handy feature with it's image transport protocol plugins, it's able to automatically compress the video stream in the background without any additional work on our side. But this feature doesn't work together with `parameter_bridge`. Without compression the 640x480 camera stream consumes almost 20 MB/s network bandwith which is unacceptable for a wireless mobile robot.
+We can see that both `/camera/camera_info` and `/camera/image` topics are forwarded. Although this is still not the ideal way to forward the camera image from Gazebo. ROS has a very handy feature with it's image transport protocol plugins, it's able to automatically compress the video stream in the background without any additional work on our side. But this feature doesn't work together with `parameter_bridge`. Without compression the 640x480 camera stream consumes almost 20 MB/s network bandwidth which is unacceptable for a wireless mobile robot.
 
 Therefore there is a dedicated `image_bridge` node in the `ros_gz_image` package. Let's modify our launch file to the following:
 
@@ -318,7 +318,7 @@ launchDescriptionObject.add_action(relay_camera_info_node)
 Rebuild the workspace and let's try it!
 
 ```bash
-ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+ros2 launch erc_gazebo_sensors spawn_robot.launch.py
 ```
 ![alt text][image6]
 
@@ -333,7 +333,7 @@ But how do we know what is the name of the parameter and what other settings do 
 
 First start the simulation:
 ```bash
-ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+ros2 launch erc_gazebo_sensors spawn_robot.launch.py
 ```
 
 Then start rqt_reconfigure:
