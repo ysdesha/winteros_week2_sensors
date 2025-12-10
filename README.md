@@ -40,7 +40,7 @@ By the end of this module, you will be able to visualize what the robot sees in 
 
 To download the starter package clone the following git repo  to your colcon workspace:
 ```bash
-wip
+git clone https://github.com/ysdesha/winteros_week2_sensors.git
 ```
 ## Test the starter package
 
