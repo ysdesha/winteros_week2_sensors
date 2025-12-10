@@ -7,6 +7,9 @@
 [image5]: ./assets/compressed_rqt.png "Adding a camera"
 [image6]: ./assets/compressed_rviz.png "Adding a camera"
 [image7]: ./assets/rqt_reconfigure.png "rqt reconfigure"
+[image8]: ./assets/lidar.png "lidar"
+[image9]: ./assets/visualize_lidar.png "lidar"
+[image10]: ./assets/decay.png "lidar"
 
 
 # WinteROS Week 2
@@ -344,6 +347,131 @@ ros2 run rqt_reconfigure rqt_reconfigure
 ![alt text][image7]
 
 We can play with the parameters here, change the compression or the algorithm as we wish and we can monitor it's impact with `rqt`.
+
+# Lidar 
+
+LIDAR (an acronym for “Light Detection and Ranging” or “Laser Imaging, Detection, and Ranging”) is a sensing technology that uses laser light to measure distances. LIDAR sensor typically emits pulses of laser light in a scanning pattern (2D or 3D) and measures how long it takes for the light to return after hitting nearby objects. From this, the system computes distances to obstacles or surfaces in the environment. By continuously scanning the surroundings, the LIDAR provides a 2D or 3D map of distances to any objects around the robot. Lidars are simple and important sensors of almost every mobile robot applications, it's widely used in Simultaneous Localization and Mapping (SLAM) algorithms which use LIDAR scans to build a map of the environment in real time while also estimating the robot’s pose (position and orientation) within that map.
+
+First, we start with a simple 2D lidar, let's add it to the urdf:
+
+```xml
+  <!-- STEP 10 - Lidar -->
+  <joint type="fixed" name="scan_joint">
+    <origin xyz="0.0 0 0.15" rpy="0 0 0"/>
+    <child link="scan_link"/>
+    <parent link="base_link"/>
+    <axis xyz="0 1 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name='scan_link'>
+    <inertial>
+      <mass value="1e-5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia
+          ixx="1e-6" ixy="0" ixz="0"
+          iyy="1e-6" iyz="0"
+          izz="1e-6"
+      />
+    </inertial>
+    <collision name='collision'>
+      <origin xyz="0 0 0" rpy="0 0 0"/> 
+      <geometry>
+        <box size=".1 .1 .1"/>
+      </geometry>
+    </collision>
+
+    <visual name='scan_link_visual'>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename = "package://erc_gazebo_sensors/meshes/lidar.dae"/>
+      </geometry>
+    </visual>
+  </link>
+```
+
+Then add the plugin to the `erc_bot.gazebo` file:
+
+```xml
+  <gazebo reference="scan_link">
+    <sensor name="gpu_lidar" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <topic>scan</topic>
+      <gz_frame_id>scan_link</gz_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <!--(max_angle-min_angle)/samples * resolution -->
+            <resolution>1</resolution>
+            <min_angle>-3.14156</min_angle>
+            <max_angle>3.14156</max_angle>
+          </horizontal>
+          <!-- Dirty hack for fake lidar detections with ogre 1 rendering in VM -->
+          <!-- <vertical>
+              <samples>3</samples>
+              <min_angle>-0.001</min_angle>
+              <max_angle>0.001</max_angle>
+          </vertical> -->
+        </scan>
+        <range>
+          <min>0.05</min>
+          <max>10.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+        </noise>
+        <frame_id>scan_link</frame_id>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+```
+
+> If you are using OGRE 1 rendering in VM and lidar reading is not properly rendered (it renders only within a small circle around the sensor) you can try to enable 3 vertical samples with very small vertical angles.
+
+Before we can test our lidar we have to update the `parameter_bridge` to forward the lidar scan topic:
+
+```python
+    # Node to bridge /cmd_vel and /odom
+    gz_bridge_node = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist",
+            "/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry",
+            "/joint_states@sensor_msgs/msg/JointState@gz.msgs.Model",
+            "/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V",
+            #"/camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
+            "/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
+            "/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan",
+        ],
+        output="screen",
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+        ]
+    )
+```
+
+Let's try it in the simulation!
+
+```bash
+ros2 launch erc_gazebo_sensors spawn_robot.launch.py
+```
+
+![alt text][image8]
+
+We can also verify the rendering of lidars in Gazebo with the `Visualize Lidar` tool:
+
+![alt text][image9]
+
+If we increase decay time of the visualization of lidar scans and we drive around the robot we can do a very simple "mapping" of the environment. Although in the next lesson we will see that mapping algorithms are more complicated, usually this a good quick and dirty test on real robots if odometry, lidar scan and the other components are working well together.
+
+![alt text][image10]
 
 
 
